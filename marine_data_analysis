@@ -1,1 +1,116 @@
+import numpy as np
+import matplotlib.pyplot as plt
 
+ddir = 'C:/Users/user/Desktop/'
+nino3_data = 'nino3(1979-2020).txt'
+sst_data = 'sst(1979-2020)_36x72(lat_lon).txt'
+lon_data = 'lon.txt'
+lat_data = 'lat.txt'
+
+f_nino3 = open(ddir + nino3_data, 'r').readlines()
+f_sst = open(ddir + sst_data, 'r').readlines()
+
+## read in longitude and latitude text files
+f_lon = open(ddir + lon_data, 'r').readlines()
+f_lat = open(ddir + lat_data, 'r').readlines()
+
+list_nino3 = []
+for i in f_nino3:
+    list_nino3.append(float(i.strip()))
+
+list_sst = []
+for j in f_sst:
+    list_sst.append((float(j.strip())))
+
+## strip off \n of each line of longitude data and append to list_lon
+list_lon = []
+for k in f_lon:
+    list_lon.append((float(k.strip())))
+
+## strip off \n of each line of latitude data and append to list_lat
+list_lat = []
+for l in f_lat:
+    list_lat.append((float(l.strip())))
+
+# list -> array
+nino3_1d = np.array(list_nino3)
+sst_1d = np.array(list_sst)
+lon = np.array(list_lon)
+lat = np.array(list_lat)
+
+# 1D -> 2D
+nino3 = nino3_1d.reshape(-1,12)
+# 1D -> 4D (year, month, latitude, longitude)
+sst = sst_1d.reshape(42, 12, 36, 72)
+
+# sst climatology 구하기
+sst_clim = np.mean(sst, 0)
+
+#sst anomaly 구하기
+sst_anom = sst - sst_clim
+for i in range(len(sst)):
+    sst_anom[i, :, :, :] = sst[i, :, :, :] - sst_clim
+
+################################################################
+###### Tropical Indian Ocean warming trend and variability #####
+# Task 1A: 열대 인도양 (위도 25S~25N, 경도 40E~90E) 지역을 뽑아냅
+lat_index = sst_anom[np.where((lat > -25) & (lat < 25))]
+lon_index = sst_anom[np.where((lon > 40) & (lon < 90))]
+
+IO_sst_anom = sst_anom[:, :, 13:22+1, 9:17+1]
+
+# Task 1B: 공간 평균을 해서 시계열 데이터만 남기기 (NaN 값에 주의)
+
+lat_mean = np.nanmean(IO_sst_anom, axis=2)
+avg_IO_sst_anom = np.nanmean(lat_mean, axis=2)
+
+# Task 2: 열대 인도양 가을철 (9~11월) 을 뽑아서 평균
+avg_IO_sst_anom = avg_IO_sst_anom[:, 8:11]
+avg_IO_sst_anom_fall = np.nanmean(avg_IO_sst_anom, axis=1)
+
+# Task 3A: 가을철(9, 10, 11월) nino3 인덱스를 평균: 1979~2020년 동안 42개의 가을철 평균 nino3 인덱스 생성.
+nino3_autumn = nino3[:, 8:11]    #가을철(9, 10, 11월) nino3
+avg_nino3_autumn = np.mean(nino3_autumn, axis=1)  # 가을철 nino3 평균
+
+# Task 3B: 가을철 평균 nino3 가 1.0 이상인 연도 (El Nino years)와 -1.0 이하인 연도 (La Nina years)를 추출하고 각각의 연도를 print
+years = np.arange(1979, 2021) # 1979~2020 년까지
+ElNino_years = years[avg_nino3_autumn >= 1.0]
+ElNino_anom = avg_IO_sst_anom_fall[avg_nino3_autumn > 1.0]
+LaNina_years = years[avg_nino3_autumn <= -1.0]
+LaNina_anom = avg_IO_sst_anom_fall[avg_nino3_autumn < -1.0]
+print(ElNino_years)
+print(LaNina_years)
+
+# Task 4A: # X축은 year, Y축은 열대 인도양 가을철 온도 아노말리로 그려보기
+fig = plt.figure(figsize=(9, 6))
+plt.plot(years, avg_IO_sst_anom_fall, '--', color='black', label='IO SST anomaly')
+
+
+# Task 4B: Task 3B 에서 찾은 엘니뇨 연도들을 red circle로, 라니냐 연도들을 blue square로 표기.
+# 마커 크기는 10으로 지정하고 label은 각각 'El Nino years'와 'La Nina years'로 한다.
+plt.plot(ElNino_years, ElNino_anom, 'ro', markersize=10, label='El Nino years')
+plt.plot(LaNina_years, LaNina_anom, 'bs', markersize=10, label='La Nina years')
+
+
+# Task 4C: 수업시간에 보여준 그림이 잘 구현되도록 title, xlabel, ylabel, legend, axis 등을 잘 조정.
+# 다음 사항들을 그래프에 포함시켜 그려보자.
+plt.title('Indian Ocean SST anomalies', pad=16, fontsize=18)
+x = np.arange(1980, 2021, 5)
+y = np.arange(-0.75, 0.76, 0.25)
+plt.xticks(x, labels=['80', '85', '90', '95', '00', '05', '10', '15', '20'], fontsize=14)
+plt.yticks(y, fontsize=14)
+plt.xlabel('years', fontsize=16)
+plt.ylabel('SST anomaly', fontsize=16)
+plt.grid(True)
+plt.legend(fontsize=13)
+plt.show()
+
+#제목은 'Indian Ocean SST anomalies'이고 , 글자크기=18pt 로 한다. 그래프와의 간격은 16pt로 지정한다.
+# x축 눈금은 1980을 나타내는 '80' 부터 2020을 나타내는 '20'까지 5년 간격으로 조정한다. 글자 크기는 14pt
+#x축 제목은 'years'로 하고 글자크기는 16pt로 한다.
+
+#y축 눈금은 -0.75 부터 0.75 까지 0.25 간격으로 하고 글자 크기는 14pt로 한다.
+#y축 제목은 'SST anomaly'로 하고 글자크기는 16pt로 한다.
+
+#x축과 y축 격자를 그래프로 나타낸다.
+#범례 글자크기를 13pt로 지정하고 왼쪽 상단에 위치시킨다.
